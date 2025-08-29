@@ -1,44 +1,43 @@
 use std::env::args;
-use std::path::Path;
 use std::fmt::Display;
 use std::io::Error;
+use std::path::Path;
 
-use walkdir::WalkDir;
 use histo::Histogram;
+use walkdir::WalkDir;
 
 fn process_entry(histogram: &mut Histogram, entry: &walkdir::DirEntry) -> Result<(), Error> {
-  if entry.file_type().is_file() {
-    let mut count = 0;
-    for fe in fiemap::fiemap(entry.path())? {
-      fe?;
-      count += 1;
+    if entry.file_type().is_file() {
+        let mut count = 0;
+        for fe in fiemap::fiemap(entry.path())? {
+            fe?;
+            count += 1;
+        }
+        histogram.add(count as u64);
     }
-    histogram.add(count as u64);
-  }
-  Ok(())
+    Ok(())
 }
 
 fn process<P: AsRef<Path> + Display>(dir: P) {
-  let mut histogram = Histogram::with_buckets(10);
+    let mut histogram = Histogram::with_buckets(10);
 
-  for entry in WalkDir::new(dir.as_ref())
-    .same_file_system(true) {
-    let entry = match entry {
-      Ok(entry) => entry,
-      Err(e) => {
-        eprintln!("{}: Error {:?}", dir, e);
-        continue;
-      },
-    };
-    if let Err(e) = process_entry(&mut histogram, &entry) {
-      eprintln!("{}: Error {:?}", entry.path().display(), e);
+    for entry in WalkDir::new(dir.as_ref()).same_file_system(true) {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(e) => {
+                eprintln!("{}: Error {:?}", dir, e);
+                continue;
+            }
+        };
+        if let Err(e) = process_entry(&mut histogram, &entry) {
+            eprintln!("{}: Error {:?}", entry.path().display(), e);
+        }
     }
-  }
-  println!("{}:\n{}\n", dir, histogram);
+    println!("{}:\n{}\n", dir, histogram);
 }
 
 fn main() {
-  for f in args().skip(1) {
-    process(f);
-  }
+    for f in args().skip(1) {
+        process(f);
+    }
 }
