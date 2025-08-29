@@ -1,6 +1,7 @@
 use std::fmt;
 use std::fs::File;
 use std::io::{Error, ErrorKind, Result};
+use std::os::fd::FromRawFd;
 use std::os::raw::{c_int, c_ulong};
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
@@ -21,21 +22,41 @@ pub struct Fiemap {
     ended: bool,
 }
 
-/// Get fiemap for the path and return an iterator of extents
+/// Get fiemap for the path and return an iterator of extents.
+///
+/// Same as [`Fiemap::new_from_path`].
 pub fn fiemap<P: AsRef<Path>>(filepath: P) -> Result<Fiemap> {
-    let file = File::open(filepath)?;
-    let fd = file.as_raw_fd();
-    Ok(Fiemap {
-        _file: file, // keep file alive
-        fd,
-        fiemap: C_fiemap::new(),
-        cur_idx: 0,
-        size: 0,
-        ended: false,
-    })
+    Fiemap::new_from_path(filepath)
 }
 
 impl Fiemap {
+    /// Creates a new [`Self`] from any type that implements [`AsFd`].
+    ///
+    /// The lifetime of the underlying file is tied to the lifetime of
+    /// the [`Self`] instance, as the file descriptor will be closed
+    /// after the instance of [`Self`] is dropped.
+    pub fn new(fd: impl AsRawFd) -> Self {
+        let raw_fd = fd.as_raw_fd();
+        let file = unsafe { File::from_raw_fd(raw_fd) };
+
+        Self {
+            _file: file,
+            fd: raw_fd,
+            fiemap: C_fiemap::new(),
+            cur_idx: 0,
+            size: 0,
+            ended: false,
+        }
+    }
+
+    /// Creates a new [`Self`] from a file path, opening the file in
+    /// read-only mode. See [`std::fs::File::open`] and [`Self::new`].
+    pub fn new_from_path(filepath: impl AsRef<Path>) -> Result<Fiemap> {
+        let file = File::open(filepath)?;
+
+        Ok(Self::new(file))
+    }
+
     fn get_extents(&mut self) -> Result<()> {
         let req = &mut self.fiemap;
         if self.size != 0 {
