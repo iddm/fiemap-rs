@@ -13,6 +13,7 @@ unsafe extern "C" {
     fn ioctl(fd: c_int, request: c_ulong, ...) -> c_int;
 }
 
+#[derive(Debug)]
 pub struct Fiemap {
     _file: File,
     fd: c_int,
@@ -110,6 +111,7 @@ impl Iterator for Fiemap {
     }
 }
 
+#[derive(Debug)]
 #[repr(C)]
 struct C_fiemap {
     fm_start: u64,
